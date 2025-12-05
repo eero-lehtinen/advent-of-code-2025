@@ -144,10 +144,10 @@ pub fn tokenize(source: &str) -> Vec<Token> {
                 tokens.push(Token::Literal(Value::String(tbuf.clone().into())));
                 tbuf.clear();
             }
-            ch if ch.is_alphabetic() => {
+            ch if ch.is_alphabetic() || ch == '_' => {
                 tbuf.push(ch);
                 while let Some(&next_ch) = iter.peek() {
-                    if next_ch.is_alphanumeric() {
+                    if next_ch.is_alphanumeric() || next_ch == '_' {
                         tbuf.push(next_ch);
                         iter.next();
                     } else {
