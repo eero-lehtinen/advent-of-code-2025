@@ -1,0 +1,2 @@
+lines = split(readfile("../test.txt"), "\n")
+print(lines, "x", 1.2, 1123)
