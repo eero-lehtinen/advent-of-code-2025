@@ -202,14 +202,30 @@ impl Program {
                 {
                     return Value::String(Rc::from([l.as_ref(), r.as_ref()].concat()));
                 }
+                if let (Value::String(l), Value::String(r)) = (&left_val, &right_val) {
+                    return match op {
+                        Operator::Plus => {
+                            Value::String(Rc::from([l.as_ref(), r.as_ref()].concat()))
+                        }
+                        Operator::Eq => Value::Integer((l == r) as i64),
+                        Operator::Neq => Value::Integer((l != r) as i64),
+                        _ => panic!("Cannot apply operator {:?} to strings", op),
+                    };
+                }
 
                 if let (Value::Integer(l), Value::Integer(r)) = (&left_val, &right_val) {
-                    match op {
-                        Operator::Plus => return Value::Integer(l + r),
-                        Operator::Minus => return Value::Integer(l - r),
-                        Operator::Multiply => return Value::Integer(l * r),
-                        Operator::Divide => return Value::Integer(l / r),
-                    }
+                    return Value::Integer(match op {
+                        Operator::Plus => l + r,
+                        Operator::Minus => l - r,
+                        Operator::Multiply => l * r,
+                        Operator::Divide => l / r,
+                        Operator::Lt => (l < r) as i64,
+                        Operator::Gt => (l > r) as i64,
+                        Operator::Lte => (l <= r) as i64,
+                        Operator::Gte => (l >= r) as i64,
+                        Operator::Eq => (l == r) as i64,
+                        Operator::Neq => (l != r) as i64,
+                    });
                 }
 
                 // Promote to float if both weren't integers
@@ -226,6 +242,12 @@ impl Program {
                         Operator::Minus => Value::Float(l - r),
                         Operator::Multiply => Value::Float(l * r),
                         Operator::Divide => Value::Float(l / r),
+                        Operator::Lt => Value::Integer((l < r) as i64),
+                        Operator::Gt => Value::Integer((l > r) as i64),
+                        Operator::Lte => Value::Integer((l <= r) as i64),
+                        Operator::Gte => Value::Integer((l >= r) as i64),
+                        Operator::Eq => Value::Integer((l == r) as i64),
+                        Operator::Neq => Value::Integer((l != r) as i64),
                     };
                 }
 
@@ -275,6 +297,18 @@ impl Program {
                         *self.vars.get_mut(&index_key).unwrap() = Value::Integer(i as i64);
                         *self.vars.get_mut(&item_key).unwrap() = elem.clone();
                         self.execute_block(body);
+                    }
+                }
+                AstNode::IfExpression(condition, block, else_block) => {
+                    let cond_value = self.compute_expression(condition);
+                    let cond_true = match cond_value {
+                        Value::Integer(i) => i != 0,
+                        _ => panic!("If condition must evaluate to an integer"),
+                    };
+                    if cond_true {
+                        self.execute_block(block);
+                    } else {
+                        self.execute_block(else_block);
                     }
                 }
                 _ => {

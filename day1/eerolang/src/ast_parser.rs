@@ -10,6 +10,7 @@ pub enum AstNode {
     FunctionCall(String, Vec<AstNode>),
     /// index, item, list, body
     ForLoop(String, String, Box<AstNode>, Vec<AstNode>),
+    IfExpression(Box<AstNode>, Vec<AstNode>, Vec<AstNode>),
     BinaryOp(Box<AstNode>, Operator, Box<AstNode>),
     List(Vec<AstNode>),
     Literal(Value),
@@ -107,6 +108,18 @@ fn parse_for_loop<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> AstNode {
         Box::new(collection_expr),
         body,
     )
+}
+
+fn parse_if_expression<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> AstNode {
+    let condition = parse_expression(iter).expect("Expected a condition expression after 'if'");
+    let block = parse_block(iter);
+    let token = iter.peek();
+    let mut else_block = Vec::new();
+    if token == Some(&&Token::KeywordElse) {
+        iter.next();
+        else_block = parse_block(iter);
+    }
+    AstNode::IfExpression(Box::new(condition), block, else_block)
 }
 
 fn parse_primary_expression<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Option<AstNode> {
@@ -213,6 +226,10 @@ fn parse_statement<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Option<AstNode
         Token::KeywordFor => {
             iter.next();
             parse_for_loop(iter)
+        }
+        Token::KeywordIf => {
+            iter.next();
+            parse_if_expression(iter)
         }
         _ => return None,
     };

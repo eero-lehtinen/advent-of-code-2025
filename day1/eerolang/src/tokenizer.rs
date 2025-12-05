@@ -17,6 +17,8 @@ pub enum Token {
     Ident(String),
     KeywordFor,
     KeywordIn,
+    KeywordIf,
+    KeywordElse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,13 +27,25 @@ pub enum Operator {
     Minus,
     Multiply,
     Divide,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Eq,
+    Neq,
 }
 
 impl Operator {
     pub fn precedence(&self) -> u8 {
         match self {
-            Operator::Plus | Operator::Minus => 0,
-            Operator::Multiply | Operator::Divide => 1,
+            Operator::Lt
+            | Operator::Gt
+            | Operator::Lte
+            | Operator::Gte
+            | Operator::Eq
+            | Operator::Neq => 0,
+            Operator::Plus | Operator::Minus => 1,
+            Operator::Multiply | Operator::Divide => 2,
         }
     }
 }
@@ -51,11 +65,42 @@ pub fn tokenize(source: &str) -> Vec<Token> {
     let mut tbuf = String::new();
     while let Some(ch) = iter.next() {
         match ch {
-            '=' => tokens.push(Token::Assign),
             '+' => tokens.push(Token::Operator(Operator::Plus)),
             '-' => tokens.push(Token::Operator(Operator::Minus)),
             '*' => tokens.push(Token::Operator(Operator::Multiply)),
             '/' => tokens.push(Token::Operator(Operator::Divide)),
+            '<' => {
+                if iter.peek() == Some(&'=') {
+                    iter.next();
+                    tokens.push(Token::Operator(Operator::Lte));
+                } else {
+                    tokens.push(Token::Operator(Operator::Lt));
+                }
+            }
+            '>' => {
+                if iter.peek() == Some(&'=') {
+                    iter.next();
+                    tokens.push(Token::Operator(Operator::Gte));
+                } else {
+                    tokens.push(Token::Operator(Operator::Gt));
+                }
+            }
+            '!' => {
+                if iter.peek() == Some(&'=') {
+                    iter.next();
+                    tokens.push(Token::Operator(Operator::Neq));
+                } else {
+                    panic!("Unexpected character: !");
+                }
+            }
+            '=' => {
+                if iter.peek() == Some(&'=') {
+                    iter.next();
+                    tokens.push(Token::Operator(Operator::Eq));
+                } else {
+                    tokens.push(Token::Assign);
+                }
+            }
             '(' => tokens.push(Token::LParen),
             ')' => tokens.push(Token::RParen),
             '[' => tokens.push(Token::LSquareParen),
@@ -112,6 +157,8 @@ pub fn tokenize(source: &str) -> Vec<Token> {
                 match tbuf.as_str() {
                     "for" => tokens.push(Token::KeywordFor),
                     "in" => tokens.push(Token::KeywordIn),
+                    "if" => tokens.push(Token::KeywordIf),
+                    "else" => tokens.push(Token::KeywordElse),
                     _ => tokens.push(Token::Ident(tbuf.clone())),
                 }
                 tbuf.clear();
