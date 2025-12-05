@@ -1,2 +1,8 @@
 lines = split(readfile("../test.txt"), "\n")
 print(lines, "x", 1.2, 1123)
+print(len(lines))
+print(get(lines, 0))
+
+for i, line in lines {
+	print(i, line)
+}

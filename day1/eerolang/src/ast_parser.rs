@@ -8,14 +8,20 @@ use crate::tokenizer::{Operator, Token, Value};
 pub enum AstNode {
     Assign(String, Box<AstNode>),
     FunctionCall(String, Vec<AstNode>),
+    /// index, item, list, body
+    ForLoop(String, String, Box<AstNode>, Vec<AstNode>),
     BinaryOp(Box<AstNode>, Operator, Box<AstNode>),
     List(Vec<AstNode>),
     Literal(Value),
     Variable(String),
 }
 
-fn parse_comma_separated_list<'a, I: Iterator<Item = &'a Token> + Clone>(
+trait TokIter<'a>: Iterator<Item = &'a Token> + Clone {}
+impl<'a, T: Iterator<Item = &'a Token> + Clone> TokIter<'a> for T {}
+
+fn parse_list<'a, I: TokIter<'a>>(
     iter: &mut Peekable<I>,
+    separator: Token,
     end_token: Token,
 ) -> Vec<AstNode> {
     let mut elements = Vec::new();
@@ -28,7 +34,7 @@ fn parse_comma_separated_list<'a, I: Iterator<Item = &'a Token> + Clone>(
         let element = parse_expression(iter).unwrap();
         elements.push(element);
         let next = iter.peek();
-        if let Some(Token::Comma) = next {
+        if next == Some(&&separator) {
             iter.next();
         } else if next == Some(&&end_token) {
             iter.next();
@@ -40,22 +46,70 @@ fn parse_comma_separated_list<'a, I: Iterator<Item = &'a Token> + Clone>(
     elements
 }
 
-fn parse_function_call<'a, I: Iterator<Item = &'a Token> + Clone>(
-    ident: &str,
-    iter: &mut Peekable<I>,
-) -> Option<AstNode> {
+fn parse_function_call<'a, I: TokIter<'a>>(ident: &str, iter: &mut Peekable<I>) -> Option<AstNode> {
     let next = iter.peek();
     let Some(Token::LParen) = next else {
         return None;
     };
     iter.next();
-    let args = parse_comma_separated_list(iter, Token::RParen);
+    let args = parse_list(iter, Token::Comma, Token::RParen);
     Some(AstNode::FunctionCall(ident.to_owned(), args))
 }
 
-fn parse_primary_expression<'a, I: Iterator<Item = &'a Token> + Clone>(
-    iter: &mut Peekable<I>,
-) -> Option<AstNode> {
+fn parse_block<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Vec<AstNode> {
+    if iter.next() != Some(&Token::LBrace) {
+        panic!("Expected '{{' at start of block");
+    }
+    let mut block = Vec::new();
+    while let Some(token) = iter.peek().cloned() {
+        if *token == Token::RBrace {
+            iter.next();
+            break;
+        }
+        let stmt = parse_statement(iter);
+        if let Some(node) = stmt {
+            block.push(node);
+        } else {
+            panic!("Unexpected token in block: {:?}", token);
+        }
+    }
+    block
+}
+
+fn parse_for_loop<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> AstNode {
+    let token = iter.next().unwrap();
+    let Token::Ident(index_var) = token else {
+        panic!("Expected identifier after 'for', found: {:?}", token);
+    };
+    let token = iter.next().unwrap();
+    if token != &Token::Comma {
+        panic!("Expected ',' after index variable, found: {:?}", token);
+    }
+    let token = iter.next().unwrap();
+    let Token::Ident(item_var) = token else {
+        panic!(
+            "Expected identifier after index variable, found: {:?}",
+            token
+        );
+    };
+    let token = iter.next().unwrap();
+    if token != &Token::KeywordIn {
+        panic!("Expected 'in' after item variable, found: {:?}", token);
+    }
+    let collection_expr = parse_expression(iter)
+        .expect("Failed to parse collection expression after 'in' in for loop");
+
+    let body = parse_block(iter);
+
+    AstNode::ForLoop(
+        index_var.clone(),
+        item_var.clone(),
+        Box::new(collection_expr),
+        body,
+    )
+}
+
+fn parse_primary_expression<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Option<AstNode> {
     let token = iter.peek()?;
 
     match token {
@@ -84,23 +138,20 @@ fn parse_primary_expression<'a, I: Iterator<Item = &'a Token> + Clone>(
         }
         Token::LSquareParen => {
             iter.next();
-            let elements = parse_comma_separated_list(iter, Token::RSquareParen);
+            let elements = parse_list(iter, Token::Comma, Token::RSquareParen);
             Some(AstNode::List(elements))
         }
         _ => None,
     }
 }
-//
 
-fn parse_expression<'a, I: Iterator<Item = &'a Token> + Clone>(
-    iter: &mut Peekable<I>,
-) -> Option<AstNode> {
+fn parse_expression<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Option<AstNode> {
     let left = parse_primary_expression(iter)?;
     trace!("Parsed primary expression: {:?}", left);
     parse_expression_impl(iter, left, 0)
 }
 
-fn parse_expression_impl<'a, I: Iterator<Item = &'a Token> + Clone>(
+fn parse_expression_impl<'a, I: TokIter<'a>>(
     iter: &mut Peekable<I>,
     mut left: AstNode,
     min_precedence: u8,
@@ -138,35 +189,55 @@ fn parse_expression_impl<'a, I: Iterator<Item = &'a Token> + Clone>(
     Some(left)
 }
 
+fn parse_statement<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Option<AstNode> {
+    let token = iter.peek()?;
+
+    let statement = match token {
+        Token::Ident(ident) => {
+            iter.next();
+            match *iter.peek().unwrap() {
+                Token::Assign => {
+                    trace!("Parsing assignment to {}", ident);
+                    iter.next();
+                    let expr = parse_expression(iter).unwrap();
+                    AstNode::Assign(ident.clone(), Box::new(expr))
+                }
+                t => {
+                    trace!("Parsing function call starting with identifier {}", ident);
+                    parse_function_call(ident, iter).unwrap_or_else(|| {
+                        panic!("Unexpected token after identifier '{}': {:?}", ident, t)
+                    })
+                }
+            }
+        }
+        Token::KeywordFor => {
+            iter.next();
+            parse_for_loop(iter)
+        }
+        _ => return None,
+    };
+    Some(statement)
+}
+
 pub fn parse(tokens: &[Token]) -> Vec<AstNode> {
     let mut iter = tokens.iter().peekable();
 
     let mut block = Vec::new();
 
-    while let Some(token) = iter.next() {
-        match token {
-            Token::Ident(ident) => match iter.peek().copied().unwrap() {
-                Token::Assign => {
-                    trace!("Parsing assignment to {}", ident);
-                    iter.next();
-                    let expr = parse_expression(&mut iter).unwrap();
-                    block.push(AstNode::Assign(ident.clone(), Box::new(expr)));
-                }
-                t => {
-                    trace!("Parsing function call starting with identifier {}", ident);
-                    if let Some(f) = parse_function_call(ident, &mut iter) {
-                        block.push(f);
-                    } else {
-                        panic!("Token not allowed after identifier: {:?}", t);
-                    }
-                }
-            },
-            Token::Eol => {}
-            t => {
-                println!("{:#?}", block);
-                panic!("Token not allowed: {:?}", t);
-            }
+    loop {
+        let stmt = parse_statement(&mut iter);
+        if let Some(node) = stmt {
+            block.push(node);
+        } else {
+            break;
         }
+    }
+
+    if iter.peek().is_some() {
+        panic!(
+            "Unexpected tokens remaining after parsing: {:?}",
+            iter.collect::<Vec<_>>()
+        );
     }
 
     block

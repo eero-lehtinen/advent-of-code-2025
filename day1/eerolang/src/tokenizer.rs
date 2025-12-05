@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use log::trace;
 
@@ -10,10 +10,13 @@ pub enum Token {
     RParen,
     LSquareParen,
     RSquareParen,
+    LBrace,
+    RBrace,
     Comma,
     Literal(Value),
     Ident(String),
-    Eol,
+    KeywordFor,
+    KeywordIn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,7 +41,7 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     String(Rc<str>),
-    List(Vec<Value>),
+    List(Rc<RefCell<Vec<Value>>>),
 }
 
 pub fn tokenize(source: &str) -> Vec<Token> {
@@ -57,6 +60,8 @@ pub fn tokenize(source: &str) -> Vec<Token> {
             ')' => tokens.push(Token::RParen),
             '[' => tokens.push(Token::LSquareParen),
             ']' => tokens.push(Token::RSquareParen),
+            '{' => tokens.push(Token::LBrace),
+            '}' => tokens.push(Token::RBrace),
             ',' => tokens.push(Token::Comma),
             '#' => {
                 while let Some(&next_ch) = iter.peek() {
@@ -104,7 +109,11 @@ pub fn tokenize(source: &str) -> Vec<Token> {
                         break;
                     }
                 }
-                tokens.push(Token::Ident(tbuf.clone()));
+                match tbuf.as_str() {
+                    "for" => tokens.push(Token::KeywordFor),
+                    "in" => tokens.push(Token::KeywordIn),
+                    _ => tokens.push(Token::Ident(tbuf.clone())),
+                }
                 tbuf.clear();
             }
             ch if ch.is_ascii_digit() => {
@@ -135,11 +144,7 @@ pub fn tokenize(source: &str) -> Vec<Token> {
                 }
                 tbuf.clear();
             }
-            ch if ch.is_whitespace() => {
-                if ch == '\n' {
-                    tokens.push(Token::Eol);
-                }
-            }
+            ch if ch.is_whitespace() => {}
             _ => {
                 panic!("Unexpected character: {}", ch);
             }

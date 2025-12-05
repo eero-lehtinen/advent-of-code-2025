@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 use log::trace;
 
@@ -16,14 +16,14 @@ fn builtin_print(args: &mut [Value]) -> Option<Value> {
             Value::String(s) => write!(&mut w, "\"{}\"", s).unwrap(),
             Value::List(l) => {
                 write!(&mut w, "[").unwrap();
-                for (j, item) in l.iter().enumerate() {
+                for (j, item) in l.borrow().iter().enumerate() {
                     match item {
                         Value::Integer(ii) => write!(&mut w, "{}", ii).unwrap(),
                         Value::Float(ff) => write!(&mut w, "{}", ff).unwrap(),
                         Value::String(ss) => write!(&mut w, "\"{}\"", ss).unwrap(),
                         Value::List(_) => write!(&mut w, "<nested list>").unwrap(),
                     }
-                    if j < l.len() - 1 {
+                    if j < l.borrow().len() - 1 {
                         print!(", ");
                     }
                 }
@@ -64,34 +64,110 @@ fn builtin_split(args: &mut [Value]) -> Option<Value> {
         .map(|part| Value::String(Rc::from(part)))
         .collect();
 
-    Some(Value::List(parts))
+    Some(Value::List(Rc::new(RefCell::new(parts))))
+}
+
+fn builtin_set(args: &mut [Value]) -> Option<Value> {
+    let [target, index, value] = args else {
+        panic!("set expects (list/string, int, value), got {:?}", args)
+    };
+
+    let index = match &index {
+        Value::Integer(i) => *i as usize,
+        _ => panic!("set expects second argument to be integer index"),
+    };
+
+    match target {
+        Value::List(l) => {
+            if index >= l.borrow().len() {
+                panic!("set index out of bounds");
+            }
+            l.borrow_mut()[index] = value.clone();
+            None
+        }
+        Value::String(s) => {
+            if index >= s.len() {
+                panic!("set index out of bounds");
+            }
+            let Value::String(new_char_str) = value else {
+                panic!("set value for string must be a single character string");
+            };
+            let new_char = new_char_str
+                .chars()
+                .next()
+                .expect("set value for string must be a single character string");
+            let mut chars: Vec<char> = s.chars().collect();
+            chars[index] = new_char;
+            let new_string: String = chars.into_iter().collect();
+            *s = Rc::from(new_string);
+            None
+        }
+        _ => panic!("set expects (list, index, value), got {:?}", args),
+    }
+}
+
+fn builtin_get(args: &mut [Value]) -> Option<Value> {
+    let [target, index] = args else {
+        panic!("get expects (list/string, int), got {:?}", args)
+    };
+
+    let index = match index {
+        Value::Integer(i) => *i as usize,
+        _ => panic!("get expects second argument to be integer index"),
+    };
+
+    match target {
+        Value::List(l) => {
+            if index >= l.borrow().len() {
+                panic!("get index out of bounds");
+            }
+            Some(l.borrow()[index].clone())
+        }
+        Value::String(s) => {
+            if index >= s.len() {
+                panic!("get index out of bounds");
+            }
+            Some(Value::String(Rc::from(
+                s.chars().nth(index).unwrap().to_string(),
+            )))
+        }
+        _ => panic!("get expects (list/string, index), got {:?}", args),
+    }
 }
 
 fn builtin_len(args: &mut [Value]) -> Option<Value> {
     assert_eq!(args.len(), 1, "len expects 1 argument");
 
-    match &args[0] {
-        Value::String(s) => Some(Value::Integer(s.len() as i64)),
-        Value::List(l) => Some(Value::Integer(l.len() as i64)),
-        _ => panic!("len expects (string) or (list), got {:?}", args),
-    }
+    let len = match &args[0] {
+        Value::String(s) => s.len() as i64,
+        Value::List(l) => l.borrow().len() as i64,
+        _ => panic!("len expects (list/string), got {:?}", args),
+    };
+
+    Some(Value::Integer(len))
 }
 
 pub type ProgramFn = fn(&mut [Value]) -> Option<Value>;
 
 pub struct Program {
     block: Rc<Vec<AstNode>>,
-    vars: HashMap<String, Value>,
+    vars: HashMap<Rc<str>, Value>,
     builtins: HashMap<String, ProgramFn>,
 }
 
 impl Program {
     pub fn new(block: Vec<AstNode>) -> Self {
-        let mut builtins = HashMap::<String, ProgramFn>::new();
-        builtins.insert("print".to_owned(), builtin_print);
-        builtins.insert("readfile".to_owned(), builtin_readfile);
-        builtins.insert("split".to_owned(), builtin_split);
-        builtins.insert("len".to_owned(), builtin_len);
+        let builtins: [(_, ProgramFn); _] = [
+            ("print", builtin_print),
+            ("readfile", builtin_readfile),
+            ("split", builtin_split),
+            ("len", builtin_len),
+            ("get", builtin_get),
+            ("set", builtin_set),
+        ];
+        let builtins = HashMap::<String, ProgramFn>::from(
+            builtins.map(|(name, func)| (name.to_owned(), func)),
+        );
 
         Program {
             block: Rc::new(block),
@@ -100,10 +176,14 @@ impl Program {
         }
     }
 
-    fn compute_expression<'a>(&'a self, expr: &'a AstNode) -> Value {
+    fn compute_expression<'a>(&'a mut self, expr: &'a AstNode) -> Value {
         match expr {
             AstNode::Literal(lit) => lit.clone(),
-            AstNode::Variable(name) => self.vars.get(name).expect("Undefined variable").clone(),
+            AstNode::Variable(name) => self
+                .vars
+                .get(name.as_str())
+                .unwrap_or_else(|| panic!("Undefined variable: {}", name))
+                .clone(),
             AstNode::FunctionCall(name, args) => self
                 .call_function(name, args)
                 .expect("Function did not return a value"),
@@ -112,7 +192,7 @@ impl Program {
                     .iter()
                     .map(|elem| self.compute_expression(elem))
                     .collect::<Vec<_>>();
-                Value::List(values)
+                Value::List(Rc::new(RefCell::new(values)))
             }
             AstNode::BinaryOp(left, op, right) => {
                 let mut left_val = self.compute_expression(left);
@@ -155,7 +235,7 @@ impl Program {
         }
     }
 
-    fn call_function(&self, name: &str, args: &[AstNode]) -> Option<Value> {
+    fn call_function(&mut self, name: &str, args: &[AstNode]) -> Option<Value> {
         let mut arg_values = args
             .iter()
             .map(|arg| self.compute_expression(arg))
@@ -167,24 +247,45 @@ impl Program {
         }
     }
 
-    pub fn execute(&mut self) {
-        let block = Rc::clone(&self.block);
+    fn execute_block(&mut self, block: &[AstNode]) {
         for node in block.iter() {
             match node {
                 AstNode::Assign(var, expr) => {
                     trace!("Assigning to variable: {}", var);
                     let value = self.compute_expression(expr);
-                    self.vars.insert(var.clone(), value.clone());
+                    self.vars.insert(Rc::from(var.clone()), value.clone());
                 }
                 AstNode::FunctionCall(name, args) => {
                     trace!("Calling function: {}", name);
                     self.call_function(name, args);
                 }
-                n => {
-                    self.compute_expression(n);
+                AstNode::ForLoop(index_var, item_var, collection, body) => {
+                    let collection = self.compute_expression(collection);
+                    let items = match collection {
+                        Value::List(l) => l.borrow().clone(),
+                        _ => panic!("For loop expects a list as collection"),
+                    };
+
+                    let index_key = Rc::from(index_var.as_str());
+                    let item_key = Rc::from(item_var.as_str());
+                    self.vars.insert(Rc::clone(&index_key), Value::Integer(0));
+                    self.vars.insert(Rc::clone(&item_key), Value::Integer(0));
+
+                    for (i, elem) in items.into_iter().enumerate() {
+                        *self.vars.get_mut(&index_key).unwrap() = Value::Integer(i as i64);
+                        *self.vars.get_mut(&item_key).unwrap() = elem.clone();
+                        self.execute_block(body);
+                    }
+                }
+                _ => {
                     panic!("Unexpected AST node during execution: {:#?}", node);
                 }
             }
         }
+    }
+
+    pub fn execute(&mut self) {
+        let block = Rc::clone(&self.block);
+        self.execute_block(&block);
     }
 }
