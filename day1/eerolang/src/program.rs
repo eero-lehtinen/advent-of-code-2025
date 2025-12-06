@@ -13,7 +13,7 @@ fn builtin_print(args: &mut [Value]) -> Option<Value> {
         match arg {
             Value::Integer(i) => write!(&mut w, "{}", i).unwrap(),
             Value::Float(f) => write!(&mut w, "{}", f).unwrap(),
-            Value::String(s) => write!(&mut w, "\"{}\"", s).unwrap(),
+            Value::String(s) => write!(&mut w, "{}", s).unwrap(),
             Value::List(l) => {
                 write!(&mut w, "[").unwrap();
                 for (j, item) in l.borrow().iter().enumerate() {
@@ -40,8 +40,6 @@ fn builtin_print(args: &mut [Value]) -> Option<Value> {
 }
 
 fn builtin_readfile(args: &mut [Value]) -> Option<Value> {
-    assert_eq!(args.len(), 1);
-
     let [Value::String(filename)] = &args else {
         panic!("readfile expects (string), got {:?}", args)
     };
@@ -65,6 +63,51 @@ fn builtin_split(args: &mut [Value]) -> Option<Value> {
         .collect();
 
     Some(Value::List(Rc::new(RefCell::new(parts))))
+}
+
+fn builtin_parseint(args: &mut [Value]) -> Option<Value> {
+    let [Value::String(s)] = &args else {
+        panic!("parseint expects (string), got {:?}", args)
+    };
+
+    let int_value = s
+        .parse::<i64>()
+        .unwrap_or_else(|_| panic!("Failed to parse integer from string: {}", s));
+
+    Some(Value::Integer(int_value))
+}
+
+fn builtin_substr(args: &mut [Value]) -> Option<Value> {
+    if args.len() < 2 || args.len() > 3 {
+        panic!("substr expects (string, int, opt int), got {:?}", args)
+    }
+    let string = match &args[0] {
+        Value::String(s) => s,
+        _ => panic!("substr expects first argument to be string"),
+    };
+    let start = match &args[1] {
+        Value::Integer(i) => *i,
+        _ => panic!("substr expects second argument to be integer"),
+    };
+    let mut end = if args.get(2).is_some() {
+        match &args[2] {
+            Value::Integer(i) => *i,
+            _ => panic!("substr expects third argument to be integer"),
+        }
+    } else {
+        string.len() as i64
+    };
+
+    if start < 0 || start > end {
+        panic!("substr indices out of bounds");
+    }
+    if end < 0 {
+        end = string.len() as i64 - end.abs();
+    }
+    end = end.min(string.len() as i64);
+
+    let substring = &string[start as usize..end as usize];
+    Some(Value::String(Rc::from(substring)))
 }
 
 fn builtin_set(args: &mut [Value]) -> Option<Value> {
@@ -102,7 +145,7 @@ fn builtin_set(args: &mut [Value]) -> Option<Value> {
             *s = Rc::from(new_string);
             None
         }
-        _ => panic!("set expects (list, index, value), got {:?}", args),
+        _ => panic!("set expects (list, int, value), got {:?}", args),
     }
 }
 
@@ -113,7 +156,7 @@ fn builtin_get(args: &mut [Value]) -> Option<Value> {
 
     let index = match index {
         Value::Integer(i) => *i as usize,
-        _ => panic!("get expects second argument to be integer index"),
+        _ => panic!("get expects (list/string, int), got {:?}", args),
     };
 
     match target {
@@ -131,20 +174,40 @@ fn builtin_get(args: &mut [Value]) -> Option<Value> {
                 s.chars().nth(index).unwrap().to_string(),
             )))
         }
-        _ => panic!("get expects (list/string, index), got {:?}", args),
+        _ => panic!("get expects (list/string, int), got {:?}", args),
     }
 }
 
 fn builtin_len(args: &mut [Value]) -> Option<Value> {
-    assert_eq!(args.len(), 1, "len expects 1 argument");
+    let [len] = args else {
+        panic!("len expects (list/string), got {:?}", args)
+    };
 
-    let len = match &args[0] {
+    let len = match &len {
         Value::String(s) => s.len() as i64,
         Value::List(l) => l.borrow().len() as i64,
         _ => panic!("len expects (list/string), got {:?}", args),
     };
 
     Some(Value::Integer(len))
+}
+
+fn builtin_mod(args: &mut [Value]) -> Option<Value> {
+    let [a, b] = args else {
+        panic!("mod expects (int, int), got {:?}", args)
+    };
+
+    let a = match a {
+        Value::Integer(i) => *i,
+        _ => panic!("mod expects (int, int), got {:?}", args),
+    };
+
+    let b = match b {
+        Value::Integer(i) => *i,
+        _ => panic!("mod expects (int, int), got {:?}", args),
+    };
+
+    Some(Value::Integer(a % b))
 }
 
 pub type ProgramFn = fn(&mut [Value]) -> Option<Value>;
@@ -161,9 +224,12 @@ impl Program {
             ("print", builtin_print),
             ("readfile", builtin_readfile),
             ("split", builtin_split),
+            ("parseint", builtin_parseint),
+            ("substr", builtin_substr),
             ("len", builtin_len),
             ("get", builtin_get),
             ("set", builtin_set),
+            ("mod", builtin_mod),
         ];
         let builtins = HashMap::<String, ProgramFn>::from(
             builtins.map(|(name, func)| (name.to_owned(), func)),

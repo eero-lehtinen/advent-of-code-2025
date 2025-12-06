@@ -126,6 +126,16 @@ fn parse_primary_expression<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Optio
     let token = iter.peek()?;
 
     match token {
+        Token::Operator(Operator::Minus) => {
+            iter.next();
+            let expr =
+                parse_primary_expression(iter).expect("Expected expression after unary minus");
+            Some(AstNode::BinaryOp(
+                Box::new(AstNode::Literal(Value::Integer(0))),
+                Operator::Minus,
+                Box::new(expr),
+            ))
+        }
         Token::Literal(lit) => {
             iter.next();
             Some(AstNode::Literal(lit.clone()))
