@@ -14,6 +14,9 @@ fn builtin_print(args: &mut [Value]) -> Option<Value> {
             Value::Integer(i) => write!(&mut w, "{}", i).unwrap(),
             Value::Float(f) => write!(&mut w, "{}", f).unwrap(),
             Value::String(s) => write!(&mut w, "{}", s).unwrap(),
+            Value::Range(start, end) => {
+                write!(&mut w, "{}..{}", start, end).unwrap();
+            }
             Value::List(l) => {
                 write!(&mut w, "[").unwrap();
                 for (j, item) in l.borrow().iter().enumerate() {
@@ -22,6 +25,7 @@ fn builtin_print(args: &mut [Value]) -> Option<Value> {
                         Value::Float(ff) => write!(&mut w, "{}", ff).unwrap(),
                         Value::String(ss) => write!(&mut w, "\"{}\"", ss).unwrap(),
                         Value::List(_) => write!(&mut w, "<nested list>").unwrap(),
+                        Value::Range(s, e) => write!(&mut w, "{}..{}", s, e).unwrap(),
                     }
                     if j < l.borrow().len() - 1 {
                         print!(", ");
@@ -210,6 +214,29 @@ fn builtin_mod(args: &mut [Value]) -> Option<Value> {
     Some(Value::Integer(a % b))
 }
 
+fn builtin_range(args: &mut [Value]) -> Option<Value> {
+    if args.is_empty() || args.len() > 2 {
+        panic!("range expects (int, opt int), got {:?}", args)
+    };
+
+    let mut start = match &args[0] {
+        Value::Integer(i) => *i,
+        _ => panic!("range expects (int, opt int), got {:?}", args),
+    };
+
+    let end = match args.get(1) {
+        Some(Value::Integer(i)) => *i,
+        None => {
+            let tmp = start;
+            start = 0;
+            tmp
+        }
+        _ => panic!("range expects (int, opt int), got {:?}", args),
+    };
+
+    Some(Value::Range(start, end))
+}
+
 pub type ProgramFn = fn(&mut [Value]) -> Option<Value>;
 
 pub struct Program {
@@ -230,6 +257,7 @@ impl Program {
             ("get", builtin_get),
             ("set", builtin_set),
             ("mod", builtin_mod),
+            ("range", builtin_range),
         ];
         let builtins = HashMap::<String, ProgramFn>::from(
             builtins.map(|(name, func)| (name.to_owned(), func)),
@@ -349,21 +377,32 @@ impl Program {
                 }
                 AstNode::ForLoop(index_var, item_var, collection, body) => {
                     let collection = self.compute_expression(collection);
-                    let items = match collection {
-                        Value::List(l) => l.borrow().clone(),
-                        _ => panic!("For loop expects a list as collection"),
-                    };
 
                     let index_key = Rc::from(index_var.as_str());
-                    let item_key = Rc::from(item_var.as_str());
+                    let item_key = if let Some(v) = item_var {
+                        Rc::from(v.as_str())
+                    } else {
+                        Rc::from("_INTERNAL_UNUSED")
+                    };
                     self.vars.insert(Rc::clone(&index_key), Value::Integer(0));
                     self.vars.insert(Rc::clone(&item_key), Value::Integer(0));
 
-                    for (i, elem) in items.into_iter().enumerate() {
-                        *self.vars.get_mut(&index_key).unwrap() = Value::Integer(i as i64);
-                        *self.vars.get_mut(&item_key).unwrap() = elem.clone();
-                        self.execute_block(body);
-                    }
+                    match collection {
+                        Value::List(l) => {
+                            for (i, elem) in l.borrow().iter().enumerate() {
+                                *self.vars.get_mut(&index_key).unwrap() = Value::Integer(i as i64);
+                                *self.vars.get_mut(&item_key).unwrap() = elem.clone();
+                                self.execute_block(body);
+                            }
+                        }
+                        Value::Range(start, end) => {
+                            for i in start..end {
+                                *self.vars.get_mut(&index_key).unwrap() = Value::Integer(i);
+                                self.execute_block(body);
+                            }
+                        }
+                        _ => panic!("For loop expects a list or range"),
+                    };
                 }
                 AstNode::IfExpression(condition, block, else_block) => {
                     let cond_value = self.compute_expression(condition);

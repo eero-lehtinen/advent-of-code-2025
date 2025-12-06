@@ -9,7 +9,7 @@ pub enum AstNode {
     Assign(String, Box<AstNode>),
     FunctionCall(String, Vec<AstNode>),
     /// index, item, list, body
-    ForLoop(String, String, Box<AstNode>, Vec<AstNode>),
+    ForLoop(String, Option<String>, Box<AstNode>, Vec<AstNode>),
     IfExpression(Box<AstNode>, Vec<AstNode>, Vec<AstNode>),
     BinaryOp(Box<AstNode>, Operator, Box<AstNode>),
     List(Vec<AstNode>),
@@ -78,22 +78,27 @@ fn parse_block<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> Vec<AstNode> {
 }
 
 fn parse_for_loop<'a, I: TokIter<'a>>(iter: &mut Peekable<I>) -> AstNode {
-    let token = iter.next().unwrap();
+    let mut token = iter.next().unwrap();
+    trace!("Parsing for loop, first token: {:?}", token);
     let Token::Ident(index_var) = token else {
         panic!("Expected identifier after 'for', found: {:?}", token);
     };
-    let token = iter.next().unwrap();
-    if token != &Token::Comma {
-        panic!("Expected ',' after index variable, found: {:?}", token);
-    }
-    let token = iter.next().unwrap();
-    let Token::Ident(item_var) = token else {
-        panic!(
-            "Expected identifier after index variable, found: {:?}",
-            token
-        );
+    token = iter.next().unwrap();
+    trace!("Parsing for loop, second token: {:?}", token);
+    let item_var = if token == &Token::Comma {
+        token = iter.next().unwrap();
+        trace!("Parsing for loop, item variable token: {:?}", token);
+        let Token::Ident(item_var) = token else {
+            panic!(
+                "Expected identifier after for comma variable, found: {:?}",
+                token
+            );
+        };
+        token = iter.next().unwrap();
+        Some(item_var.clone())
+    } else {
+        None
     };
-    let token = iter.next().unwrap();
     if token != &Token::KeywordIn {
         panic!("Expected 'in' after item variable, found: {:?}", token);
     }

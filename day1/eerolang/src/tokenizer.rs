@@ -56,6 +56,7 @@ pub enum Value {
     Float(f64),
     String(Rc<str>),
     List(Rc<RefCell<Vec<Value>>>),
+    Range(i64, i64),
 }
 
 pub fn tokenize(source: &str) -> Vec<Token> {

@@ -1,0 +1,21 @@
+lines = split(readfile("../input.txt"), "\n")
+
+dial = 50
+zero_count = 0
+
+for _, line in lines {
+	if get(line, 0) == "L" {
+		dir = -1
+	} else {
+		dir = 1
+	}
+	amount = parseint(substr(line, 1))
+	for i in range(amount) {
+		dial = mod(dial + dir + 100, 100)
+		if dial == 0 {
+			zero_count = zero_count + 1
+		}
+	}
+}
+
+print("Answer:", zero_count)
