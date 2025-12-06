@@ -1,16 +1,19 @@
-lines = split(readfile("../test.txt"), "\n")
-print(lines, "x", 1.2, 1123)
-print(len(lines))
-print(get(lines, 0))
+lines = split(readfile("../input.txt"), "\n")
 
-print(1 == 2, 1 + 1 == 2)
-
-if 1 == 2 {
-	print("dont print this")
-} else {
-	print("print this")
-}
+dial = 50
+zero_count = 0
 
 for _, line in lines {
-	print(i, line)
+	if get(line, 0) == "L" { 
+		dir = -1
+	} else {
+		dir = 1
+	}
+	amount = parseint(substr(line, 1))
+	dial = mod(dial + dir * amount + 100, 100)
+	if dial == 0 {
+		zero_count = zero_count + 1
+	}
 }
+
+print("Answer:", zero_count)
