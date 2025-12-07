@@ -4,6 +4,7 @@ dial = 50
 zero_count = 0
 
 for _, line in lines {
+	dir = 0
 	if get(line, 0) == "L" {
 		dir = -1
 	} else {
