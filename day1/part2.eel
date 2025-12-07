@@ -10,7 +10,7 @@ for _, line in lines {
     } else {
         dir = 1
     }
-    amount = parseint(substr(line, 1))
+    amount = int(substr(line, 1))
     for _ in range(amount) {
         dial = mod(dial + dir + 100, 100)
         if dial == 0 {
