@@ -1,16 +1,16 @@
-lines = split(readfile("../input.txt"), "\n")
+lines := split(readfile("../input.txt"), "\n")
 
-dial = 50
-zero_count = 0
+dial := 50
+zero_count := 0
 
 for _, line in lines {
-    dir = 0
+    dir := 0
     if get(line, 0) == "L" {
         dir = -1
     } else {
         dir = 1
     }
-    amount = int(substr(line, 1))
+    amount := int(substr(line, 1))
     for _ in range(amount) {
         dial = mod(dial + dir + 100, 100)
         if dial == 0 {
