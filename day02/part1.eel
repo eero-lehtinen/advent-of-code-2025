@@ -1,0 +1,28 @@
+line := readfile("input.txt")
+
+ranges := split(line, ",")
+
+total := 0
+
+for _, range in ranges {
+    parts := split(range, "-")
+    start := int(get(parts, 0))
+    end := int(get(parts, 1))
+
+    for i in range(start, end + 1) {
+        s := string(i)
+        len := len(s)
+        if mod(len, 2) != 0 {
+            continue
+        }
+        left := substr(s, 0, len / 2)
+        right := substr(s, len / 2, len)
+        if left == right {
+            total = total + i
+        }
+    }
+}
+
+print("Answer:", total)
+
+
