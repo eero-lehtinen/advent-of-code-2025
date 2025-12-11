@@ -1,4 +1,4 @@
-with open("../input.txt") as f:
+with open("input.txt") as f:
     lines = f.read().strip().split("\n")
 
 dial = 50

@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-const lines = fs.readFileSync("../input.txt", "utf-8").trim().split("\n");
+const lines = fs.readFileSync("input.txt", "utf-8").trim().split("\n");
 
 let dial = 50;
 let zero_count = 0;
