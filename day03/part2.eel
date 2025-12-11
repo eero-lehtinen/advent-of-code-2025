@@ -1,0 +1,75 @@
+lines := split(readfile("input.txt"), "\n")
+
+total := 0
+k := 12
+
+digits := list()
+len := 0
+
+max := -1
+max_at_depth := list()
+for _ in range(k) {
+    push(max_at_depth, -1)
+}
+fn reset() {
+    max = -1
+    for i in range(k) {
+        set(max_at_depth, i, -1)
+    }
+}
+    
+fn search(start_index, depth, value, mad) {
+    if depth == k {
+        if value > max {
+            max = value
+            max_at_depth = mad
+        }
+        return 1
+    }
+    
+    for i in range(start_index, len - (k - depth) + 1) {
+        new_value := value * 10 + get(digits, i)
+        if get(max_at_depth, depth) > new_value {
+            continue
+        }
+        new_mad := clone(mad)
+        push(new_mad, new_value)
+        result := search(i + 1, depth + 1, new_value, new_mad)
+    }
+    
+    return 0
+}
+
+
+for i, battery in lines {
+    digits = list()
+    len = len(battery)
+    for i in range(len) {
+        push(digits, int(get(battery, i)))
+    }
+
+    # Find the largest digit at least k from the right
+    max_digit := -1
+    max_pos := -1
+    j := len - k
+    while j >= 0 {
+        d := get(digits, j)
+        if d >= max_digit {
+            max_digit = d
+            max_pos = j
+        }
+        j = j - 1
+    }
+
+    search(max_pos, 0, 0, list())
+
+    total = total + max
+
+    print(i + 1, "out of ", len(lines), "max:", max)
+
+    reset()
+}
+
+
+
+print("Answer:", total)
