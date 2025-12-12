@@ -1,0 +1,75 @@
+lines := split(readfile("input.txt"), "\n")
+
+EMPTY := 0
+ROLL := 1
+
+width := 0
+height := len(lines)
+
+map := list()
+
+
+for y, line in lines {
+    width = len(line)
+    for x in range(len(line)) {
+        char := get(line, x)
+        thing := char == "@" and ROLL or EMPTY
+        push(map, thing)
+    }
+}
+
+total := 0
+
+OFFSETS := list(
+    0, -1,
+    1, -1,
+    1, 0,
+    1, 1,
+    0, 1,
+    -1, 1,
+    -1, 0,
+    -1, -1
+)
+
+
+removals := list()
+
+while 1 {
+    for y in range(height) {
+        for x in range(width) {
+            if get(map, width * y + x) != ROLL {
+                continue
+            }
+            adjacents := 0
+            for i in range(len(OFFSETS) / 2) {
+                offx := get(OFFSETS, i * 2)
+                offy := get(OFFSETS, i * 2 + 1)
+                nx := x + offx
+                ny := y + offy
+                if nx < 0 or nx >= width or ny < 0 or ny >= height {
+                    continue
+                }
+                neighbor := get(map, width * ny + nx)
+                if neighbor == ROLL {
+                    adjacents = adjacents + 1
+                }
+            }
+
+            if adjacents < 4 {
+                push(removals, width * y + x)
+            }
+        }
+    }
+
+    if len(removals) == 0 {
+        break
+    }
+
+    for _, i in removals {
+        set(map, i, EMPTY)
+        total = total + 1
+    }
+    removals = list()
+}
+
+print("Answer:", total)
