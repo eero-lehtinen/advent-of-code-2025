@@ -1,0 +1,30 @@
+contents := readfile("input.txt")
+
+parts := split(contents, "\n\n")
+
+incredient_ranges := list()
+
+for i, line in split(get(parts, 0), "\n") {
+    range := split(line, "-")
+    push(incredient_ranges, list(int(get(range, 0)), int(get(range, 1))))
+}
+
+fresh_count := 0
+
+for i, line in split(get(parts, 1), "\n") {
+    id := int(line)
+    found := 0
+    for _, r in incredient_ranges {
+        min := get(r, 0)
+        max := get(r, 1)
+        if min <= id and id <= max {
+            found = 1
+            break
+        }
+    }
+    if found {
+        fresh_count = fresh_count + 1
+    }
+}
+
+print("Answer:", fresh_count)
