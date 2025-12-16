@@ -1,0 +1,44 @@
+contents := readfile("input.txt")
+
+problems := list()
+
+ADD := "+"
+MULT := "*"
+
+for li, line in split(contents, "\n") {
+    i := 0
+    for _, part in split(line, " ") {
+        if part == "" {
+            continue
+        }
+        if li == 0 {
+            push(problems, list())
+        }
+        p := get(problems, i)
+        if part == ADD or part == MULT {
+            push(p, part)
+        } else {
+            push(p, int(part))
+        }
+        i = i + 1
+    }
+}
+
+grand_total := 0
+
+for _, p in problems {
+    op := pop(p)
+    total := get(p, 0)
+    for i in range(1, len(p)) {
+        if op == ADD {
+            total = total + get(p, i)
+        }
+        if op == MULT {
+            total = total * get(p, i)
+        }
+    }
+    grand_total = grand_total + total
+}
+
+print("Answer:", grand_total)
+
