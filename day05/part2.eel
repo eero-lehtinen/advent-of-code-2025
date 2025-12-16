@@ -1,0 +1,62 @@
+contents := readfile("input.txt")
+
+parts := split(contents, "\n\n")
+
+incredient_ranges := list()
+
+for i, line in split(get(parts, 0), "\n") {
+    range := split(line, "-")
+    push(incredient_ranges, list(int(get(range, 0)), int(get(range, 1))))
+}
+
+fn insertion_sort_by_first_item(list) {
+    i := 1
+    len := len(list)
+    while i < len {
+        x := get(list, i)
+        j := i
+        while j > 0 and get(get(list, j - 1), 0) > get(x, 0) {
+            set(list, j, get(list, j - 1))
+            j = j - 1
+        }
+        set(list, j, x)
+        i = i + 1
+    }
+}
+
+fresh_ranges := list()
+
+for _, r in incredient_ranges {
+    push(fresh_ranges, r)
+    insertion_sort_by_first_item(fresh_ranges)
+
+    i := len(fresh_ranges) - 1
+    while i > 0 {
+        cur := get(fresh_ranges, i)
+        prev := get(fresh_ranges, i - 1)
+
+        cur_s := get(cur, 0)
+        prev_e := get(prev, 1)
+
+        if cur_s <= prev_e {
+            cur_e := get(cur, 1)
+            prev_s := get(prev, 0)
+
+            remove(fresh_ranges, i)
+
+            set(fresh_ranges, i-1, list(
+                min(cur_s, prev_s),
+                max(cur_e, prev_e)
+            ))
+        }
+        i = i - 1
+    }
+}
+
+fresh_count := 0
+
+for _, r in fresh_ranges {
+    fresh_count = fresh_count + get(r, 1) + 1 - get(r, 0)
+}
+
+print("Answer:", fresh_count)
