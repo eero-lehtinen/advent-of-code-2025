@@ -1,0 +1,85 @@
+contents := readfile("input.txt")
+
+lines := split(contents, "\n")
+char_lines := list()
+for i in range(len(lines) - 1) {
+    push(char_lines, list())
+    parts := split(get(lines, i), "")
+    char_line := get(char_lines, i)
+    for j in range(len(parts) - 1) {
+        if j != 0 {
+            push(char_line, get(parts, j))
+        }
+        
+    }
+}
+
+w := len(get(char_lines, 0))
+h := len(char_lines)
+
+problems := list()
+
+ADD := "+"
+MULT := "*"
+
+pi := 0
+numi := 0
+x := w - 1
+while x >= 0 {
+    if pi >= len(problems) {
+        push(problems, list())
+    }
+    for y, char_line in char_lines {
+        char := get(char_line, x)
+      
+        p := get(problems, pi)
+
+        if y == h - 1 { 
+             if char == ADD or char == MULT {
+                push(p, char)
+                pi = pi + 1
+                numi = -1
+                x = x - 1
+            }   
+        }
+        else {
+            if numi >= len(p) {
+                push(p, list())
+            }
+            if char != " " {
+                nums := get(p, numi)
+                push(nums, int(char))
+            }
+        }
+    }
+    numi = numi + 1
+    x = x - 1
+}
+
+grand_total := 0
+
+fn digits_to_num(digits) {
+    num := 0
+    for i, d in digits {
+        num = num + d * pow(10, len(digits) - i - 1)
+    }
+    return num
+}
+
+for _, problem in problems {
+    op := pop(problem)
+    total := digits_to_num(get(problem, len(problem) - 1))
+    for i in range(len(problem) - 2, -1) {
+        num := digits_to_num(get(problem, i))
+        if op == ADD {
+            total = total + num
+        }
+        if op == MULT {
+            total = total * num
+        }
+    }
+    grand_total = grand_total + total
+}
+
+print("Answer:", grand_total)
+
