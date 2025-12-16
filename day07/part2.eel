@@ -1,0 +1,86 @@
+contents := trim(readfile("input.txt"))
+
+BEAM := "S"
+EMPTY := "."
+SPLITTER := "^"
+
+beam_x := 0
+
+lines := split(contents, "\n")
+for i, line in lines {
+    line = split(line, "")
+    remove(line, 0)
+    pop(line)
+    for j, char in line {
+        if char == BEAM {
+            beam_x = j
+        }
+    }
+}
+
+width := len(get(lines, 0))
+height := len(lines)
+
+fn find(list, item) {
+    for _, i in list {
+        if get(i, 0) == item {
+            return i
+        }
+    }
+    return null
+}
+
+
+beams := list(list(beam_x, 1))
+for y in range(height) {
+    new_beams := list()
+    for _, beam_item in beams {
+        x := get(beam_item, 0)
+        timelines := get(beam_item, 1)
+
+        cur := get(get(lines, y), x)
+
+        if cur == SPLITTER {
+            left := find(new_beams, x - 1)
+            if left {
+                set(left, 1, get(left, 1) + timelines)
+            } else {
+                item := list(x - 1, timelines)
+                push(new_beams, item)
+            }
+
+            right := find(new_beams, x + 1)
+            if right {
+                set(right, 1, get(right, 1) + timelines)
+            } else {
+                item := list(x + 1, timelines)
+                push(new_beams, item)
+            }
+
+        } else {
+            found := find(new_beams, x)
+            if found {
+                set(found, 1, get(found, 1) + timelines)
+            } else {
+                item := list(x, timelines)
+                push(new_beams, item)
+            }
+        }
+    }
+    beams = new_beams
+}
+
+timelines := 0
+for _, beam_item in beams {
+    timelines = timelines + get(beam_item, 1)
+}
+
+print("Answer:", timelines)
+
+
+
+
+
+
+
+
