@@ -1,4 +1,4 @@
-lines := split(readfile("input.txt"), "\n")
+lines := split(trim(readfile("input.txt")), "\n")
 
 dial := 50
 zero_count := 0

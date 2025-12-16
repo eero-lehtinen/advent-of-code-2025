@@ -1,4 +1,4 @@
-lines := split(readfile("input.txt"), "\n")
+lines := split(trim(readfile("input.txt")), "\n")
 
 EMPTY := 0
 ROLL := 1

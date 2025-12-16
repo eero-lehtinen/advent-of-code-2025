@@ -1,4 +1,4 @@
-contents := readfile("input.txt")
+contents := trim(readfile("input.txt"))
 
 problems := list()
 
