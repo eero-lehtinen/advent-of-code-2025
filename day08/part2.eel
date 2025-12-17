@@ -1,0 +1,136 @@
+contents := trim(readfile("input.txt"))
+
+lines := split(contents, "\n")
+
+boxes := list()
+
+for _, line in lines {
+    parts := split(line, ",")
+    box := list()
+    for _, part in parts {
+        push(box, int(part))
+    }
+    push(boxes, box)
+}
+
+
+fn distance_squared(box_a, box_b) {
+    dist := 0
+    for i, v in box_a {
+        dist = dist + pow(v - get(box_b, i), 2)
+    }
+    return dist
+}
+
+fn contains(box_list, box) {
+    for _, b in box_list {
+        contains := 1
+        for i, v in b {
+            if v != get(box, i) {
+                contains = 0
+            }
+        }
+        if contains == 1 {
+            return 1
+        }
+    }
+    return 0
+}
+
+fn get_dist(item) {
+    return get(item, 2)
+}
+
+fn partition_by_dist(A, lo, hi) {
+    pivot := get_dist(get(A, hi))
+    i := lo
+    for j in range(lo, hi) {
+        if get_dist(get(A, j)) < pivot {
+            temp := get(A, i)
+            set(A, i, get(A, j))
+            set(A, j, temp)
+            i = i + 1
+        }
+    }
+    temp := get(A, i)
+    set(A, i, get(A, hi))
+    set(A, hi, temp)
+    return i
+}
+
+fn quicksort_by_dist(A, lo, hi) {
+    if lo >= hi or lo < 0 {
+        return 1
+    }
+    p := partition_by_dist(A, lo, hi)
+    quicksort_by_dist(A, lo, p - 1)
+    quicksort_by_dist(A, p + 1, hi)
+}
+
+fn insertion_sort_by_len(list) {
+    i := 1
+    len := len(list)
+    while i < len {
+        x := get(list, i)
+        j := i
+        while j > 0 and len(get(list, j - 1)) > len(x) {
+            set(list, j, get(list, j - 1))
+            j = j - 1
+        }
+        set(list, j, x)
+        i = i + 1
+    }
+}
+
+circuits := list()
+
+for _, box in boxes {
+    push(circuits, list(box))
+}
+
+results := list()
+
+boxes_len := len(boxes)
+
+for i, box1 in boxes {
+    for j in range(i + 1, boxes_len) {
+        box2 := get(boxes, j)
+        dist := distance_squared(box1, box2)
+        push(results, list(box1, box2, dist))
+    }
+}
+
+quicksort_by_dist(results, 0, len(results) - 1)
+
+answer := 0
+
+i := -1
+while 1 {
+    i = i + 1
+    x := get(results, i)
+    box_a := get(x, 0)
+    box_b := get(x, 1)
+
+    circuit_b_idx := null
+    for j, circuit in circuits {
+        if contains(circuit, box_b) {
+            circuit_b_idx = j
+        }
+    }
+    for j, circuit in circuits {
+        if contains(circuit, box_a) and j != circuit_b_idx {
+            for _, box in get(circuits, circuit_b_idx) {
+                push(circuit, box)
+            }
+            remove(circuits, circuit_b_idx)
+            break
+        }
+    }
+
+    if len(circuits) == 1 {
+        answer = get(box_a, 0) * get(box_b, 0)
+        break
+    }
+}
+
+print("Answer:", answer)
