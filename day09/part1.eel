@@ -1,0 +1,64 @@
+contents := trim(readfile("input.txt"))
+
+red_tiles := list()
+
+for _, line in split(contents, "\n") {
+    parts := split(line, ",")
+    push(red_tiles, list(int(get(parts, 0)), int(get(parts, 1))))
+}
+
+
+fn get_size(item) {
+    return get(item, 2)
+}
+
+fn partition_by_size(A, lo, hi) {
+    pivot := get_size(get(A, hi))
+    i := lo
+    for j in range(lo, hi) {
+        if get_size(get(A, j)) < pivot {
+            temp := get(A, i)
+            set(A, i, get(A, j))
+            set(A, j, temp)
+            i = i + 1
+        }
+    }
+    temp := get(A, i)
+    set(A, i, get(A, hi))
+    set(A, hi, temp)
+    return i
+}
+
+fn quicksort_by_size(A, lo, hi) {
+    if lo >= hi or lo < 0 {
+        return 1
+    }
+    p := partition_by_size(A, lo, hi)
+    quicksort_by_size(A, lo, p - 1)
+    quicksort_by_size(A, p + 1, hi)
+}
+
+fn abs(n) {
+    if n < 0 {
+        return -n
+    }
+    return n
+}
+
+results := list()
+
+for i, tile in red_tiles {
+    for j in range(i + 1, len(red_tiles)) {
+        other_tile := get(red_tiles, j)
+        
+        width := abs(get(tile, 0) - get(other_tile, 0)) + 1
+        height := abs(get(tile, 1) - get(other_tile, 1)) + 1
+        push(results, list(tile, other_tile, width * height))
+    }
+}
+
+quicksort_by_size(results, 0, len(results) - 1)
+
+largest := get(results, len(results) - 1)
+
+print("Answer:", get(largest, 2))
