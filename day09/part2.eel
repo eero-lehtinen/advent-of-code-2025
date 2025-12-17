@@ -1,0 +1,138 @@
+contents := trim(readfile("input.txt"))
+
+red_tiles := list()
+
+for _, line in split(contents, "\n") {
+    parts := split(line, ",")
+    push(red_tiles, list(int(get(parts, 0)), int(get(parts, 1))))
+}
+
+horizontal_lines := list()
+vertical_lines := list()
+
+fn get_x(tile) {
+    return get(tile, 0)
+}
+fn get_y(tile) {
+    return get(tile, 1)
+}
+
+prev_tile := get(red_tiles, len(red_tiles) - 1)
+for _, tile in red_tiles {
+    px := get_x(prev_tile)
+    py := get_y(prev_tile)
+    y := get_y(tile)
+    x := get_x(tile)
+
+    if py == y {
+        minx := min(px, x)
+        maxx := max(px, x)
+        push(horizontal_lines, list(minx, maxx, y))
+    }
+    else {
+        miny := min(py, y)
+        maxy := max(py, y)
+        push(vertical_lines, list(miny, maxy, x))
+    }
+
+    prev_tile = tile
+}
+
+# print("Horizontal lines:", horizontal_lines)
+# print("Vertical lines:", vertical_lines)
+
+
+fn get_area(item) {
+    return get(item, 4)
+}
+
+fn partition(A, lo, hi) {
+    pivot := get_area(get(A, hi))
+    i := lo
+    for j in range(lo, hi) {
+        if get_area(get(A, j)) < pivot {
+            temp := get(A, i)
+            set(A, i, get(A, j))
+            set(A, j, temp)
+            i = i + 1
+        }
+    }
+    temp := get(A, i)
+    set(A, i, get(A, hi))
+    set(A, hi, temp)
+    return i
+}
+
+fn quicksort(A, lo, hi) {
+    if lo >= hi or lo < 0 {
+        return 1
+    }
+    p := partition(A, lo, hi)
+    quicksort(A, lo, p - 1)
+    quicksort(A, p + 1, hi)
+}
+
+results := list()
+
+fn polygon_within_lines(x1, x2, y1, y2) {
+    # Find intersections
+    for _, line in horizontal_lines {
+        minx := get(line, 0)
+        maxx := get(line, 1)
+        ly := get(line, 2)
+
+        if x1 < maxx and x2 > minx and y1 < ly and ly < y2 {
+            return 0
+        }
+    }
+    for _, line in vertical_lines {
+        miny := get(line, 0)
+        maxy := get(line, 1)
+        lx := get(line, 2)
+
+        if y1 < maxy and y2 > miny and x1 < lx and lx < x2 {
+            return 0
+        }
+    }
+    return 1
+}
+
+for i, tile in red_tiles {
+    tile_x := get_x(tile)
+    tile_y := get_y(tile)
+    for j in range(i + 1, len(red_tiles)) {
+        other_tile := get(red_tiles, j)
+        other_tile_x := get_x(other_tile)
+        other_tile_y := get_y(other_tile)
+
+        x1 := min(tile_x, other_tile_x)
+        x2 := max(tile_x, other_tile_x)
+        y1 := min(tile_y, other_tile_y)
+        y2 := max(tile_y, other_tile_y)
+
+        area := (x2 - x1 + 1) * (y2 - y1 + 1)
+        push(results, list(x1, y1, x2, y2, area))
+    }
+}
+
+quicksort(results, 0, len(results) - 1)
+
+largest := list()
+
+for i in range(len(results) - 1, -1) {
+    item := get(results, i)
+    x1 := get(item, 0)
+    y1 := get(item, 1)
+    x2 := get(item, 2)
+    y2 := get(item, 3)
+
+    if polygon_within_lines(x1, x2, y1, y2) {
+        largest = item
+        break
+    }
+}
+
+print("Largest polygon:", largest)
+area := get(largest, 4)
+
+print("Answer:", area)
