@@ -1,0 +1,117 @@
+contents := trim(readfile("input.txt"))
+
+problems := list()
+for _, line in split(contents, "\n") {
+    parts := split(line, " ")
+
+    lights_part := get(parts, 0)
+
+    light_targets := list()
+    for i in range(1, len(lights_part) - 1) {
+        push(light_targets, get(lights_part, i) == "#" and 1 or 0)
+    }
+
+    buttons := list()
+    joltages := list()
+    for i in range(1, len(parts)) {
+        part := get(parts, i)
+        if get(part, 0) == "(" {
+            buttons_tmp := list()
+            for _, p in split(substr(part, 1, len(part) - 1), ",") {
+                push(buttons_tmp, int(p))
+            }
+            push(buttons, buttons_tmp)
+        } else {
+            for _, p in split(substr(part, 1, len(part) - 1), ",") {
+                push(joltages, int(p))
+            }
+        }
+    }
+
+    push(problems, list(light_targets, buttons, joltages))
+}
+print(problems)
+
+light_targets := null
+buttons := null
+
+fn lights_correct(lights) {
+    for i, l in lights {
+        if l != get(light_targets, i) {
+            return 0
+        }
+    }
+    return 1
+}
+
+fn apply_button(lights, button_idx) {
+    for _, b in get(buttons, button_idx) {
+        set(lights, b, not(get(lights, b)))
+    }
+}
+
+results := list()
+
+for i, problem in problems {
+    light_targets = get(problem, 0)
+    buttons = get(problem, 1)
+    buttons_len := len(buttons)
+    # joltages := get(problem, 2)
+
+    lights := list()
+    for _ in range(len(light_targets)) {
+        push(lights, 0)
+    }
+
+    # print("Problem ", i + 1, lights, light_targets, buttons)
+
+    if lights_correct(lights) {
+        push(results, 0)
+        continue
+    }
+    
+    queue := queue()
+    for i in range(buttons_len) {
+        push(queue, list(lights, i, 0))
+    }
+
+    seen := map()
+    
+    while len(queue) > 0 {
+        item := pop_front(queue)
+
+        cur_lights := clone(get(item, 0))
+        button_idx := get(item, 1)
+        press_count := get(item, 2) + 1
+
+        apply_button(cur_lights, button_idx)
+
+        key := string(cur_lights)
+        if has(seen, key) {
+            continue
+        }
+        set(seen, key, 1)
+
+        if lights_correct(cur_lights) {
+            push(results, press_count)
+            # print(press_count)
+            break
+        }
+
+    
+        for i in range(buttons_len) {
+            push(queue, list(cur_lights, i, press_count))
+        }
+    }
+}
+
+result := 0
+for _, r in results {
+    result = result + r
+}
+
+# print(results)
+print("Answer:", result)
+
+
+
